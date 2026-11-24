@@ -38,11 +38,15 @@ let S = { view: 'login', hist: [], hechas: {}, pend: 0, cargando: false };
 
 function toast(m, ms) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), ms || 2600); }
 function go(v, extra) {
-  if (v === 'home' || v === 'seg') S.pdfBack = v === 'seg' ? 'seg' : null;
+  if (v === 'home' || v === 'seg') { S.pdfBack = v === 'seg' ? 'seg' : null; S.editando = null; }
   S.view = v; Object.assign(S, extra || {}); render(); window.scrollTo(0, 0);
   if (v === 'home' || v === 'seg') refrescar();
 }
-function banner() { return Nube.DEMO ? '<div class="proto">MODO DEMOSTRACIÓN · los datos se guardan solo en este celular</div>' : ''; }
+function banner() {
+  const demo = Nube.DEMO ? '<div class="proto">MODO DEMOSTRACIÓN · los datos se guardan solo en este celular</div>' : '';
+  const E = S.editando, fol = E && Object.values(E.folios || {}).filter(Boolean).join(' · ');
+  return demo + (E && ['iny', 'sop', 'ino', 'cap', 'fug', 'paq', 'firma'].includes(S.view) ? `<div class="editando">✏️ Corrigiendo ${fol ? esc(fol) : 'la auditoría'} · se guarda con el mismo folio</div>` : '');
+}
 function header(t, back = 'home') { return banner() + `<header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Regresar">‹</button>` : ''}<h1>${t}</h1><span class="chip">${INSPECTOR ? INSPECTOR.visa + ' · ' : ''}${turno()}</span></header>` + prog(); }
 function prog() {
   if (!S.au || !['iny', 'sop', 'ino', 'cap', 'fug'].includes(S.view)) return ''; let d = 0, n = 0; const a = S.au;
@@ -272,7 +276,9 @@ function togMaq(m){const l=S.au.A.iny.maqs;const i=l.indexOf(m);i<0?l.push(m):l.
 function capMark(key,v){S.au.r[key]=Object.assign(S.au.r[key]||{},{v});render()}
 
 /* ---------- PAQUETE MUESTRA ---------- */
-function vPaq(){const a=S.au;const ok=a.label&&a.def&&a.pz&&a.fotos.length;
+function paqListo(a){return !!(a.label&&a.def&&String(a.pz||'').trim()&&a.fotos.length&&(a.def!=='Otro'||String(a.defOtro||'').trim()))}
+function paqOk(){const b=document.getElementById('paqGen');if(b)b.disabled=!paqListo(S.au)}
+function vPaq(){const a=S.au;const ok=paqListo(a);
  const campo=(k,t,num)=>`<div><label class="f">${t}</label><input class="i ${a.leidos&&a[k]?'auto':''}" ${num?'inputmode="numeric"':''} value="${esc(a[k]||'')}" ${k==='art'?`onchange="S.au.art=this.value;S.au.desc='';render()"`:`oninput="S.au.${k}=this.value"`}></div>`;
  return header('Paquete muestra')+`<main>
  ${!a.label&&!a.leyendo?`<button class="tile" style="width:100%;min-height:150px;align-items:center;justify-content:center;text-align:center" onclick="leerEtiqueta()"><span class="ic" style="width:60px;height:60px;border-radius:18px;background:var(--c-paq)">${ICO.paq}</span><b>1. Foto de la etiqueta</b><small>Se leen artículo, lote, máquina, paquete y fecha</small></button>`:''}
@@ -282,11 +288,12 @@ function vPaq(){const a=S.au;const ok=a.label&&a.def&&a.pz&&a.fotos.length;
   <div class="grid2">${campo('art','Artículo',1)}${campo('op','Lote',1)}</div>${artInfo()}
   <div class="grid2">${campo('maq','Máquina')}${campo('paq','Paquete')}</div>
   <div class="grid2">${campo('visa','Operador')}${campo('fprod','Fecha de producción')}</div>
-  <label class="f">2. ¿Qué se detectó?</label><div class="chips">${DEFECTOS.map(d=>`<button class="chipb ${a.def===d?'on':''}" style="padding:7px 12px;font-size:13px" onclick="S.au.def='${d}';render()">${d}</button>`).join('')}</div>
-  <div class="grid2"><div><label class="f">3. ¿Cuántas piezas?</label><input class="i" inputmode="numeric" value="${esc(a.pz)}" oninput="S.au.pz=this.value"></div><div><label class="f">Cliente</label><input class="i" value="${esc(a.cliente)}" oninput="S.au.cliente=this.value"></div></div>
+  <label class="f">2. ¿Qué se detectó?</label><div class="chips">${DEFECTOS.map(d=>`<button class="chipb ${a.def===d?'on':''}" style="padding:7px 12px;font-size:13px" onclick="S.au.def='${d}';render();if('${d}'==='Otro')setTimeout(()=>{const x=document.getElementById('defOtro');x&&x.focus()},60)">${d==='Otro'?'✏️ Otro':d}</button>`).join('')}</div>
+  ${a.def==='Otro'?`<input class="i" id="defOtro" style="margin-top:8px" placeholder="Escribe el defecto que encontraste" value="${esc(a.defOtro||'')}" oninput="S.au.defOtro=this.value;paqOk()">`:''}
+  <div class="grid2"><div><label class="f">3. ¿Cuántas piezas?</label><input class="i" inputmode="numeric" value="${esc(a.pz)}" oninput="S.au.pz=this.value;paqOk()"></div><div><label class="f">Cliente</label><input class="i" value="${esc(a.cliente)}" oninput="S.au.cliente=this.value"></div></div>
   <label class="f">4. Fotos del defecto</label><div class="photo">${a.fotos.map((p,k)=>`<div class="ph" style="background-image:url(${p})"><button class="x" onclick="quitarFoto('p',0,${k})">×</button></div>`).join('')}<button class="add" onclick="fotoPaq()">+ Foto</button></div>
   <label class="f">Comentario (opcional)</label><textarea class="i" oninput="S.au.obs=this.value">${esc(a.obs)}</textarea>`:''}
- </main><div class="bar"><button class="btn sec" onclick="go('home')">Cancelar</button><button class="btn red" ${ok?'':'disabled'} onclick="S.tipo='paq';S.firmas=null;finish()">Generar reporte</button></div>`}
+ </main><div class="bar"><button class="btn sec" onclick="go('home')">Cancelar</button><button class="btn red" id="paqGen" ${ok?'':'disabled'} onclick="S.tipo='paq';S.firmas=null;finish()">${S.editando?'Guardar corrección':'Generar reporte'}</button></div>`}
 function fotoPaq(){tomarFoto(d=>{S.au.fotos.push(d);render()})}
 /* ---------- FIRMA ---------- */
 function vFirma(){const t='Supervisor o Líder de turno';
@@ -311,7 +318,7 @@ function hallazgos(){const a=S.au,t=S.tipo,out=[];
   EPP.forEach((it,i)=>{const r=a.e[i];if(r?.v==='bad')out.push({p:it[0],crit:it[1],obs:[r.visa&&'Visa: '+r.visa,r.raz&&'Razón: '+r.raz].filter(Boolean).join(' · '),pz:'',fotos:[],cls:'inocuidad'})})}
  if(t==='cap')['iny','sop'].forEach(ar=>{if(a.A[ar].est!=='ok')return;const cols=colsCap(ar);preguntas(ar).forEach(([sc,q],i)=>{const malos=cols.filter(c=>a.r[ar+'|'+i+'|'+c]?.v==='bad');if(malos.length){const c=a.r[ar+'|c'+i]||{};out.push({p:q,crit:AREAS[ar].split(' ·')[0]+' · '+malos.join(', '),obs:(c.t||'')+(c.pend?' · '+(c.pend==='Sí'?'Corregido al momento':'PENDIENTE: plan de acción SG.FO.09.02 en 4 días'):''),pz:'',fotos:c.fotos||[],cls:'calidad'})}})});
  if(t==='fug')return hallazgosFug(a);
- if(t==='paq')out.push({p:a.def,crit:'',obs:a.obs||'',pz:a.pz,fotos:a.fotos,cls:DEF[a.def]||'calidad'});
+ if(t==='paq')out.push({p:a.def==='Otro'?(String(a.defOtro||'').trim()||'Otro'):a.def,crit:'',obs:a.obs||'',pz:a.pz,fotos:a.fotos,cls:DEF[a.def]||'calidad'});
  return out}
 function titulo(){const a=S.au;if(S.tipo==='fug'){const f=hallazgosFug(a).length,p=MAQ_FUG.filter(m=>a.r[m].est==='parada').length;return `Comprobadores de fuga · semana ${(S.pdf&&S.pdf.sem)||semana()}${f?' · '+f+' NOK':''}${p?' · '+p+' parada'+(p>1?'s':''):''}`}if(S.tipo==='cap')return `Auditoría por capas · nivel ${a.nivel}${capasParada()?' · MÁQUINA PARADA':''}`;if(S.tipo==='paq')return `Paquete muestra · ${a.maq} · Art. ${a.art}`;return S.tipo==='iny'?`Auditoría Inyección · ${a.area}${a.maq?' · '+a.maq:''}`:S.tipo==='sop'?`Auditoría Soplado · ${a.maq||'—'} · Art. ${a.art||'—'}`:`Auditoría de Inocuidad · ${a.zona}`}
 
@@ -320,7 +327,7 @@ function vDone(){const n={iny:'Auditoría de producto · Inyección',sop:'Audito
  const par=S.tipo==='cap'&&capasParada();
  return header('Listo',null)+`<main style="text-align:center;padding-top:40px">
  <div style="width:80px;height:80px;border-radius:50%;background:${S.ultimoPendiente?'#FFF1C2':'var(--okbg)'};color:${S.ultimoPendiente?'#8A5A00':'var(--ok)'};font-size:40px;line-height:80px;margin:0 auto">${S.ultimoPendiente?'⏳':'✓'}</div>
- <h2 style="color:var(--navy)">${n} guardada</h2>
+ <h2 style="color:var(--navy)">${n} guardada</h2>${btnEditar()}
  <p class="muted">${S.ultimoPendiente?'Sin señal: quedó guardada en el celular y se enviará sola al recuperar internet.':par?'Máquina parada: se registraron los dos formatos, Inyección y Soplado.':'Sin hallazgos. Quedó registrada en el historial.'}</p>
  <div class="card" style="text-align:left"><div class="row"><b>${n}</b><span class="pill p-ok">${fol.length?esc(fol.join(' · ')):'Por enviar'}</span></div><div class="muted">${hoy()} · ${hora()} · ${turno()}</div></div>
  </main><div class="bar"><button class="btn sec" onclick="go('pdf')">Ver PDF</button><button class="btn" onclick="go('home')">Inicio</button></div>`}
@@ -344,7 +351,7 @@ function vRep(){const R=S.rep,a=R.au;const h0=R.h[0];
   ['¿Dónde ha sido detectado?',dond]];
  return header(R.h.length?'Reporte de hallazgo':'Registro de auditoría',S.pdfBack||'home')+`<main>
  ${R.h.length?`<div class="result r-bad" style="margin-top:0">${R.h.length} hallazgo${R.h.length>1?'s':''} · ${R.folio?'reporte '+R.folio:'reporte por asignar (sin señal)'}</div>`:`<div class="result" style="margin-top:0;background:#eceff3;color:#4b5563">Formatos registrados · MÁQUINA PARADA</div>`}
- <div class="doc" style="margin-top:12px">
+ ${btnEditar()}<div class="doc" style="margin-top:12px">
   <div class="hd"><img src="${IMG.logo}"><div style="flex:1;text-align:center;font-weight:bold;font-size:13px;color:var(--navy)">${R.tipo==='paq'?'REPORTE DE PAQUETE MUESTRA':'REPORTE DE HALLAZGO'}</div><div class="code">${esc(R.folio||'Por asignar')}</div></div>
   <table>${filas.map(f=>`<tr><td class="k">${f[0]}</td><td class="v">${esc(f[1])}</td></tr>`).join('')}</table>
   ${R.h.length?'':`<div style="margin:10px;border:3px solid #9aa4b1;color:#6b7280;font-weight:bold;font-size:20px;text-align:center;padding:10px;transform:rotate(-4deg);letter-spacing:2px">MÁQUINA PARADA<br><span style="font-size:13px">sin máquina por auditar</span></div>`}
@@ -368,7 +375,7 @@ function pdfSecciones(P,area){const a=P.au,t=P.tipo,S3=[];
   const cols=colsCap(ar);let cur=null;preguntas(ar).forEach(([sc,q],i)=>{if(!cur||cur.titulo!==AREAS[ar].split(' ·')[0].toUpperCase()+' · '+sc[0].toUpperCase()){cur={titulo:AREAS[ar].split(' ·')[0].toUpperCase()+' · '+sc[0].toUpperCase(),cols,rows:[]};S3.push(cur)}
   const C=a.r[ar+'|c'+i]||{};cur.rows.push({n:i+1,t:q,c:'',m:cols.map(c=>!aplica(sc,c)?'—':(v=>v==='ok'?'<b style="color:#1E7B3C">✓</b>':v==='bad'?'<b style="color:#B3261E">✗</b>':'')(a.r[ar+'|'+i+'|'+c]?.v)),o:[C.t,C.pend==='No, queda pendiente'?'PENDIENTE':'' ].filter(Boolean).join(' · ')})})});
  return S3}
-function vPdf(){const P=S.pdf,t=P.tipo;const areas=t==='cap'?(P.area?[P.area]:['iny','sop']):[null];return header('PDF · vista previa',S.rep&&S.rep.au===P.au&&S.rep.h.length?'rep':S.pdfBack||'done')+`<main style="background:#e9eef5;padding:10px">${areas.map((ar,k)=>(areas.length>1?`<div class="muted noprint" style="margin:${k?14:0}px 4px 6px;font-weight:700">Formato ${k+1} de 2 · ${ar==='iny'?'Inyección':'Soplado'}</div>`:'')+docPdf(P,ar)).join('')}
+function vPdf(){const P=S.pdf,t=P.tipo;const areas=t==='cap'?(P.area?[P.area]:['iny','sop']):[null];return header('PDF · vista previa',S.rep&&S.rep.au===P.au&&S.rep.h.length?'rep':S.pdfBack||'done')+`<main style="background:#e9eef5;padding:10px">${btnEditar()}${areas.map((ar,k)=>(areas.length>1?`<div class="muted noprint" style="margin:${k?14:0}px 4px 6px;font-weight:700">Formato ${k+1} de 2 · ${ar==='iny'?'Inyección':'Soplado'}</div>`:'')+docPdf(P,ar)).join('')}
  <div class="note noprint" style="margin-top:12px">Para entregar en físico: toca <b>Imprimir</b>. Cada formato sale en su propia hoja tamaño carta. En el celular se puede mandar a una impresora de la red o guardar como PDF. Con <b>Compartir PDF</b> se manda el archivo por WhatsApp o correo.</div></main>
  <div class="bar noprint"><button class="btn sec" onclick="window.print()">Imprimir</button><button class="btn" onclick="compartirPDF()">Compartir PDF</button></div>`}
 function docPdf(P,area){if(P.tipo==='fug')return docPdfFug(P);const a=P.au,t=P.tipo;const secs=pdfSecciones(P,area);
@@ -560,31 +567,50 @@ function insertarFotos(au, fotos) {
   return au;
 }
 async function finish() {
-  const t = S.tipo, a = S.au, h = hallazgos();
+  const t = S.tipo, a = S.au, h = hallazgos(), E = S.editando;
   S.sup = (S.firmas && S.firmas.bn) || (S.firmas && S.firmas.iny ? S.firmas.iny.n + ' / ' + S.firmas.sop.n : '');
-  const insp = { nombre: INSPECTOR.nombre, visa: INSPECTOR.visa }, ahora = new Date().toISOString();
-  const base = { insp, fecha: hoy(), hora: hora(), turno: turno(), sem: semana(), sup: S.sup, fmt: JSON.parse(JSON.stringify(FMTS)) };
+  const insp = E ? E.insp : { nombre: INSPECTOR.nombre, visa: INSPECTOR.visa }, ahora = E ? E.fechaISO : new Date().toISOString();
+  // Al corregir se conservan fecha, hora, turno y pie de formato originales; solo se anota cuándo se corrigió.
+  const base = E ? { insp, fecha: E.fecha, hora: E.hora, turno: E.turno, sem: E.sem, sup: S.sup, fmt: E.fmt, editado: new Date().toISOString(), editadoPor: INSPECTOR.visa }
+    : { insp, fecha: hoy(), hora: hora(), turno: turno(), sem: semana(), sup: S.sup, fmt: JSON.parse(JSON.stringify(FMTS)) };
   S.pdf = Object.assign({ tipo: t, au: a, firmas: S.firmas, folios: {} }, base);
-  const grupo = t === 'cap' ? uid() : null, formatos = t === 'cap' ? ['iny', 'sop'] : [null];
+  const grupo = E ? E.grupo : t === 'cap' ? uid() : null, formatos = t === 'cap' ? ['iny', 'sop'] : [null];
+  const ids = {}, regTurno = E ? E.regTurno : turno();
   go('guardando'); const resp = [];
   try {
     for (const ar of formatos) {
-      const { au, fotos } = extraerFotos(a, ar);
+      const { au, fotos } = extraerFotos(a, ar), k = ar || 'x';
       const hh = ar ? h.filter(x => x.crit.startsWith(ar === 'iny' ? 'Inyección' : 'Soplado')) : h;
       const reg = {
-        id: uid(), grupo, tipo: t, area: ar || (t === 'iny' ? a.area : null), fecha: ahora, turno: turno(),
+        id: E ? E.ids[k] : uid(), grupo, tipo: t, area: ar || (t === 'iny' ? a.area : null), fecha: ahora, turno: regTurno,
         nivel: (t === 'ino' || t === 'cap') ? +a.nivel : null,
         titulo: ar ? `Capas · ${ar === 'iny' ? 'Inyección' : 'Soplado'} · nivel ${a.nivel}${a.A[ar].est === 'parada' ? ' · máquina parada' : ''}` : titulo(),
         datos: Object.assign({ au }, base), hallazgos: hh.length, parada: ar ? a.A[ar].est === 'parada' : false, con_reporte: h.length > 0,
-        firmas: t === 'cap' ? { a: S.firmas.a, [ar]: S.firmas[ar] } : S.firmas, fotos
+        firmas: t === 'cap' ? { a: S.firmas.a, [ar]: S.firmas[ar] } : S.firmas, fotos, editar: !!E
       };
-      const r = await Nube.guardar(reg); resp.push(r); S.pdf.folios[ar || 'x'] = r.folio;
+      ids[k] = reg.id;
+      const r = await Nube.guardar(reg); resp.push(r); S.pdf.folios[k] = r.folio || (E && E.folios[k]) || null;
     }
   } catch (e) { toast('No se pudo guardar: ' + e.message, 5000); go(t === 'paq' ? 'paq' : 'firma'); return; }
   S.ultimoPendiente = resp.some(r => r.pendiente);
-  S.rep = h.length ? { folio: resp.map(r => r.reporte).find(Boolean) || null, h, tipo: t, au: a, fecha: hoy(), hora: hora(), turno: turno(), insp, sup: S.sup } : null;
+  S.rep = h.length ? { folio: resp.map(r => r.reporte).find(Boolean) || (E && E.reporte) || null, h, tipo: t, au: a, fecha: base.fecha, hora: base.hora, turno: base.turno, insp, sup: S.sup } : null;
+  S.edit = { tipo: t, ids, grupo, fechaISO: ahora, fecha: base.fecha, hora: base.hora, turno: base.turno, regTurno, sem: base.sem, fmt: base.fmt, insp, folios: Object.assign({}, S.pdf.folios), reporte: S.rep && S.rep.folio };
+  S.editando = null;
   if (S.ultimoPendiente) toast('Sin señal: quedó guardado en el celular y se enviará solo al haber internet.', 4500);
+  else if (E) toast('Corrección guardada', 2500);
   S.pdfBack = null; go(h.length ? 'rep' : 'done');
+}
+/* ---------- Corregir una auditoría (antes de enviarla o imprimirla) ---------- */
+const MAX_EDICION = 48 * 3600e3;
+function puedeEditar() { const E = S.edit; return !!(E && S.pdf && E.tipo === S.pdf.tipo && Date.now() - new Date(E.fechaISO) < MAX_EDICION); }
+function btnEditar() { return puedeEditar() ? `<button class="btn-editar noprint" onclick="editar()">✏️ Editar auditoría</button>` : ''; }
+function editar() {
+  if (!puedeEditar()) { toast('Esta auditoría ya no se puede corregir'); return; }
+  const E = S.edit, au = JSON.parse(JSON.stringify(S.pdf.au));
+  if (E.tipo === 'fug') au.abierta = null;
+  S.editando = E; S.firmas = null;
+  go(E.tipo, { au, tipo: E.tipo });
+  toast(E.tipo === 'paq' ? 'Corrige lo necesario y vuelve a guardar' : 'Corrige y vuelve a firmar para guardar', 2500);
 }
 function vGuardando() { return banner() + `<main style="text-align:center;padding-top:120px"><div class="spin"></div><h2 style="color:var(--navy)">Guardando…</h2><p class="muted">No cierres la app.</p></main>`; }
 async function abrirHist(id) {
@@ -596,6 +622,8 @@ async function abrirHist(id) {
     S.pdf = { tipo: reg.tipo, au, firmas: reg.firmas || {}, fecha: d.fecha, hora: d.hora, turno: d.turno, insp: d.insp || { nombre: r.nombre, visa: reg.visa }, sem: d.sem, fmt: d.fmt, area: reg.tipo === 'cap' ? reg.area : undefined, folios: { [reg.tipo === 'cap' ? reg.area : 'x']: reg.folio } };
     let h = hallazgos(); if (reg.tipo === 'cap') h = h.filter(x => x.crit.startsWith(reg.area === 'iny' ? 'Inyección' : 'Soplado'));
     S.rep = h.length ? { folio: reg.reporte, h, tipo: reg.tipo, au, fecha: d.fecha, hora: d.hora, turno: d.turno, insp: S.pdf.insp, sup: d.sup } : null;
+    S.edit = reg.visa === INSPECTOR.visa && reg.tipo !== 'cap' ? { tipo: reg.tipo, ids: { x: reg.id }, grupo: reg.grupo || null, fechaISO: reg.fecha, fecha: d.fecha, hora: d.hora, turno: d.turno,
+      regTurno: reg.turno, sem: d.sem, fmt: d.fmt, insp: S.pdf.insp, folios: { x: reg.folio }, reporte: reg.reporte } : null;
     S.pdfBack = S.view === 'home' ? 'home' : 'seg'; S.view = S.rep ? 'rep' : 'pdf'; render(); window.scrollTo(0, 0);
   } catch (e) { toast(e.message, 4000); }
 }

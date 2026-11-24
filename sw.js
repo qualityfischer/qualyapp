@@ -1,5 +1,5 @@
 /* Guarda la app en el celular para que abra y capture sin señal. */
-const VERSION = 'qualyapp-v1.0.0';
+const VERSION = 'qualyapp-v1.1.0';
 const BASE = ['./', 'index.html', 'config.js', 'datos.js', 'semilla.js', 'nube.js', 'ocr.js', 'pdfgen.js', 'app.js', 'manifest.json', 'img/logo.png', 'img/icono-192.png', 'img/icono-512.png'];
 const PESADOS = ['lib/html2canvas.min.js', 'lib/jspdf.umd.min.js', 'lib/xlsx.full.min.js', 'lib/tesseract/tesseract.min.js', 'lib/tesseract/worker.min.js',
   'lib/tesseract/tesseract-core-lstm.wasm.js', 'lib/tesseract/tesseract-core-simd-lstm.wasm.js', 'lib/tesseract/lang/eng.traineddata.gz'];

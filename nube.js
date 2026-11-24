@@ -111,6 +111,15 @@ const Nube = (() => {
       },
       async aud_guardar({ p_token, p_reg }) {
         const u = usuario(p_token), r0 = db.registros.find(r => r.id === p_reg.id);
+        if (r0 && p_reg.editar) {
+          if (r0.visa !== u.visa && u.rol !== 'admin') throw new Error('Solo quien hizo la auditoría puede corregirla.');
+          if (Date.now() - new Date(r0.fecha) > 48 * 3600e3) throw new Error('Ya no se puede corregir: pasaron más de 48 horas.');
+          let rep = r0.reporte;
+          if (p_reg.con_reporte) { if (!rep) { const g = r0.grupo && db.registros.find(r => r.grupo === r0.grupo && r.reporte); rep = g ? g.reporte : folio(r0.tipo === 'paq' ? 'PM' : 'H', r0.fecha); } } else rep = null;
+          Object.assign(r0, { titulo: p_reg.titulo, datos: p_reg.datos || {}, hallazgos: p_reg.hallazgos || 0, parada: !!p_reg.parada, reporte: rep, firmas: p_reg.firmas || null, editado: new Date().toISOString(), ediciones: (r0.ediciones || 0) + 1 });
+          db.fotos[r0.id] = p_reg.fotos || []; await guardarDB();
+          return { id: r0.id, folio: r0.folio, reporte: rep, fotos: (p_reg.fotos || []).length, editado: true };
+        }
         if (r0) return { id: r0.id, folio: r0.folio, reporte: r0.reporte, repetido: true };
         if (!puede(u.rol, p_reg.tipo)) throw new Error('Tu perfil no puede registrar este tipo de auditoría.');
         const fecha = p_reg.fecha || new Date().toISOString();
